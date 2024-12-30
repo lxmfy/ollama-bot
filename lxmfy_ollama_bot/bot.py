@@ -31,7 +31,7 @@ else:
     load_dotenv()
 
 OLLAMA_API_URL = args.api_url or os.getenv(
-    "OLLAMA_API_URL", "http://100.94.142.23:11434"
+    "OLLAMA_API_URL", "http://localhost:11434"
 )
 MODEL = args.model or os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 SAVE_CHAT_HISTORY = not args.no_chat_history
