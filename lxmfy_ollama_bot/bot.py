@@ -30,7 +30,7 @@ else:
 OLLAMA_API_URL = args.api_url or os.getenv(
     "OLLAMA_API_URL", "http://localhost:11434"
 )
-MODEL = args.model or os.getenv("OLLAMA_MODEL", "gemma3n:e2b")
+MODEL = args.model or os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 SAVE_CHAT_HISTORY = False
 LXMF_ADMINS = (
     set(filter(None, args.admins.split(",")))
