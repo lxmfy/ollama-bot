@@ -16,7 +16,7 @@ edit `.env` with your ollama api url, model, and lxmf address.
 
 ## Installation and Running
 
-`pipx install git+https://github.com/lxmfy/lxmfy.git`
+`pipx install git+https://github.com/lxmfy/ollama-bot.git`
 
 `pipx run lxmfy-ollama-bot`
 
