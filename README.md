@@ -18,7 +18,7 @@ edit `.env` with your ollama api url, model, and lxmf address.
 
 `pipx install git+https://github.com/lxmfy/ollama-bot.git`
 
-`pipx run lxmfy-ollama-bot`
+`lxmfy-ollama-bot`
 
 ### Poetry 
 
