@@ -13,7 +13,7 @@ license = "MIT"
 python = "^3.13"
 lxmfy = "^0.7.5"
 python-dotenv = "^1.0.1"
-requests = "^2.32.3"
+requests = "^2.32.4"
 rns = "^0.9.6"
 
 [tool.poetry.group.dev.dependencies]
