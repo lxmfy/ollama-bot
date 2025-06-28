@@ -1,11 +1,8 @@
 # ollama-bot
 
-Interact with Ollama LLMs
+Interact with Ollama LLMs using LXMFy bot framework.
 
 ![showcase](lxmfy-ollama-showcase.png)
-
-> [!WARNING]  
-> The bot stores chat history by default, to disable use: --no-chat-history.
 
 ## Setup
 
@@ -19,18 +16,26 @@ edit `.env` with your ollama api url, model, and lxmf address.
 
 ## Installation and Running
 
+`pipx install git+https://github.com/lxmfy/lxmfy.git`
+
+`pipx run lxmfy-ollama-bot`
+
+### Poetry 
+
 `poetry install`
 
-`poetry run bot`
+`poetry run lxmfy-ollama-bot`
 
-## Commands
+## Commands 
 
-`help` - show help.
+Command prefix: `/`
 
-`about` - show about.
+`/help` - show help message
 
-`debug` - toggle debug mode.
+`/about` - show bot information
 
-`ask <prompt>` - ask the bot a question.
+## Chat
 
-`chat <prompt>` - start a chat session with the bot.
+Send any message **without** the `/` prefix to chat with the AI model.
+
+The bot will automatically respond using the configured Ollama model.

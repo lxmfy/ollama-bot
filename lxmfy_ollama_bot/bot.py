@@ -1,20 +1,17 @@
-import os
 import argparse
-from dotenv import load_dotenv
-from lxmfy import LXMFBot
-import requests
+import os
+import time
 from queue import Queue
 from threading import Thread
-import time
-from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+from lxmfy import LXMFBot
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Ollama Bot")
     parser.add_argument("--env", type=str, help="Path to env file")
-    parser.add_argument(
-        "--no-chat-history", action="store_true", help="Disable chat history"
-    )
     parser.add_argument("--api-url", type=str, help="Ollama API URL")
     parser.add_argument("--model", type=str, help="Ollama model name")
     parser.add_argument(
@@ -33,10 +30,12 @@ else:
 OLLAMA_API_URL = args.api_url or os.getenv(
     "OLLAMA_API_URL", "http://localhost:11434"
 )
-MODEL = args.model or os.getenv("OLLAMA_MODEL", "llama3.2:latest")
-SAVE_CHAT_HISTORY = not args.no_chat_history
+MODEL = args.model or os.getenv("OLLAMA_MODEL", "gemma3n:e2b")
+SAVE_CHAT_HISTORY = False
 LXMF_ADMINS = (
-    args.admins.split(",") if args.admins else os.getenv("LXMF_ADMINS", "").split(",")
+    set(filter(None, args.admins.split(",")))
+    if args.admins
+    else set(filter(None, os.getenv("LXMF_ADMINS", "").split(",")))
 )
 
 
@@ -47,6 +46,24 @@ class OllamaAPI:
         self.request_queue = Queue(maxsize=queue_size)
         self.response_queue = {}
         self._start_worker()
+        self._test_connection()
+
+    def _test_connection(self):
+        """Test connection to Ollama API and get available models"""
+        try:
+            response = requests.get(f"{self.api_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                models = response.json().get("models", [])
+                if models:
+                    print(f"✓ Connected to Ollama. {len(models)} model(s) available")
+                    if not any(MODEL in m['name'] for m in models):
+                        print(f"⚠ Warning: Configured model '{MODEL}' not found in available models")
+                else:
+                    print("⚠ Connected to Ollama but no models available")
+            else:
+                print(f"✗ Ollama API returned status {response.status_code}")
+        except Exception as e:
+            print(f"✗ Failed to connect to Ollama API: {e}")
 
     def _start_worker(self):
         """Start the worker thread to process requests"""
@@ -107,48 +124,113 @@ class OllamaAPI:
         return response.json()
 
 
-def setup_cogs():
-    """Copy package cogs to config/cogs if they don't exist"""
-    current_dir = Path(__file__).parent
-    package_cogs = current_dir / "cogs"
-    config_cogs = Path("config/cogs")
-
-    config_cogs.mkdir(parents=True, exist_ok=True)
-
-    for cog_file in package_cogs.glob("*.py"):
-        if not cog_file.name.startswith("_"):
-            dest_file = config_cogs / cog_file.name
-            if not dest_file.exists():
-                dest_file.write_text(cog_file.read_text())
-                RNS.log(f"Copied cog {cog_file.name} to config/cogs", RNS.LOG_INFO)
-
-
 def create_bot():
-    setup_cogs()
-
     bot = LXMFBot(
         name="OllamaBot",
         announce=600,
         admins=LXMF_ADMINS,
         hot_reloading=True,
-        command_prefix="",
+        command_prefix="/",
         rate_limit=5,
         cooldown=5,
         max_warnings=3,
         warning_timeout=300,
+        cogs_enabled=False,
+        cogs_dir="",
     )
 
     bot.ollama = OllamaAPI(OLLAMA_API_URL, queue_size=10)
     bot.save_chat_history = SAVE_CHAT_HISTORY
 
-    from lxmfy import load_cogs_from_directory
+    @bot.command(name="help")
+    def help_command(ctx):
+        """Show available commands"""
+        help_text = """Available Commands:
 
-    load_cogs_from_directory(bot)
+=== General ===
+/help - Show this help message
+/about - Show bot information
+
+=== Chat ===
+Send any message without the "/" prefix to chat with the AI model.
+The bot will respond using the configured Ollama model."""
+        ctx.reply(help_text)
+
+    @bot.command(name="about")
+    def about_command(ctx):
+        """Show bot information"""
+        about_text = f"""OllamaBot v1.0.0
+
+Connected to: {OLLAMA_API_URL}
+Model: {MODEL}
+Admins: {len(LXMF_ADMINS)} configured
+
+This bot allows you to chat with AI models through Ollama.
+Simply send a message without any command prefix to start chatting."""
+        ctx.reply(about_text)
+
+
+
+    @bot.events.on("message_received")
+    def handle_message(event):
+        """Handle all incoming messages"""
+        lxmf_message = event.data.get("message")
+        sender_hash = event.data.get("sender")
+
+        if not lxmf_message or not hasattr(lxmf_message, "content") or not lxmf_message.content:
+            return
+
+        try:
+            content_str = lxmf_message.content.decode('utf-8').strip()
+        except UnicodeDecodeError:
+            bot.send(sender_hash, "Error: Message content is not valid UTF-8.")
+            return
+
+        if bot.command_prefix and content_str.startswith(bot.command_prefix):
+            return
+
+        if not content_str:
+            return
+
+
+
+        def callback(response):
+            """Handle Ollama API response"""
+            if "error" in response:
+                error_msg = response["error"]
+                if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                    bot.send(sender_hash, f"Unable to connect to Ollama API. Please check if Ollama is running at {OLLAMA_API_URL}")
+                else:
+                    bot.send(sender_hash, f"Error: {error_msg}")
+            else:
+                if "response" in response:
+                    text = response["response"]
+                elif "message" in response:
+                    text = response["message"].get("content", "")
+                else:
+                    text = "Unexpected response format"
+
+                if text.strip():
+                    bot.send(sender_hash, text.strip())
+                else:
+                    bot.send(sender_hash, "Received empty response from AI model")
+
+        # Send chat message to Ollama
+        try:
+            bot.ollama.chat([{"role": "user", "content": content_str}], callback=callback)
+        except Exception as e:
+            bot.send(sender_hash, f"Failed to process message: {str(e)}")
 
     return bot
 
 
 def main():
+    print("Starting OllamaBot...")
+    print(f"Ollama API: {OLLAMA_API_URL}")
+    print(f"Model: {MODEL}")
+    if LXMF_ADMINS:
+        print(f"Admins: {len(LXMF_ADMINS)} configured")
+
     bot = create_bot()
     bot.run()
 

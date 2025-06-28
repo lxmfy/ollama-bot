@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "lxmfy-ollama-bot"
-version = "0.1.0"
+version = "1.0.0"
 description = "An LXMF bot for interacting with Ollama LLM Models"
 authors = ["Sudo-Ivan"]
 readme = "README.md"
@@ -11,13 +11,13 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.13"
-lxmfy = "^0.4.0"
+lxmfy = "^0.7.5"
 python-dotenv = "^1.0.1"
 requests = "^2.32.3"
+rns = "^0.9.6"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.8.4"
-bandit = "^1.8.0"
+ruff = "^0.11.11"
 
 [tool.poetry.scripts]
 lxmfy-ollama-bot = "lxmfy_ollama_bot.bot:main"
