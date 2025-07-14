@@ -56,7 +56,7 @@ class OllamaAPI:
                 models = response.json().get("models", [])
                 if models:
                     print(f"✓ Connected to Ollama. {len(models)} model(s) available")
-                    if not any(MODEL in m['name'] for m in models):
+                    if not any(MODEL in m["name"] for m in models):
                         print(f"⚠ Warning: Configured model '{MODEL}' not found in available models")
                 else:
                     print("⚠ Connected to Ollama but no models available")
@@ -70,22 +70,20 @@ class OllamaAPI:
 
         def worker():
             while True:
+                request_id, endpoint, data, callback = self.request_queue.get()
                 try:
-                    request_id, endpoint, data, callback = self.request_queue.get()
-                    try:
-                        response = requests.post(
-                            f"{self.api_url}/api/{endpoint}",
-                            json=data,
-                            timeout=self.timeout,
-                        )
-                        result = response.json()
-                        callback(result)
-                    except Exception as e:
-                        callback({"error": str(e)})
-                    finally:
-                        self.request_queue.task_done()
-                except Exception:
-                    time.sleep(1)
+                    response = requests.post(
+                        f"{self.api_url}/api/{endpoint}",
+                        json=data,
+                        timeout=self.timeout,
+                    )
+                    result = response.json()
+                    callback(result)
+                except Exception as e:
+                    callback({"error": str(e)})
+                    time.sleep(1) # Add sleep here to prevent busy-waiting on errors
+                finally:
+                    self.request_queue.task_done()
 
         thread = Thread(target=worker, daemon=True)
         thread.start()
@@ -181,7 +179,7 @@ Simply send a message without any command prefix to start chatting."""
             return
 
         try:
-            content_str = lxmf_message.content.decode('utf-8').strip()
+            content_str = lxmf_message.content.decode("utf-8").strip()
         except UnicodeDecodeError:
             bot.send(sender_hash, "Error: Message content is not valid UTF-8.")
             return
