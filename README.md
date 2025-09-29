@@ -10,9 +10,7 @@ Interact with Ollama LLMs using LXMFy bot framework.
 ## Setup
 
 ```
-git clone https://github.com/lxmfy/ollama-bot.git
-cd ollama-bot
-cp .env-example .env
+curl -o .env https://raw.githubusercontent.com/lxmfy/ollama-bot/main/.env-example
 ```
 
 edit `.env` with your Ollama API URL, Model, and LXMF address.
