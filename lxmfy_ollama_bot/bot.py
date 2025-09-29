@@ -253,34 +253,34 @@ Simply send a message without any command prefix to start chatting."""
         # Get current queue status
         queue_size = bot.ollama.request_queue.qsize()
 
-        stats_text = f"""🤖 Bot Statistics 🤖
+        stats_text = f"""Bot Statistics
 
-📊 Messages Processed: {bot.messages_processed}
-⏱️  Average Response Time: {avg_response_time:.2f}s
-🕐 Uptime: {uptime_str}
-📈 Messages/Hour: {messages_per_hour:.1f}
-❌ Error Count: {bot.error_count}
-📊 Error Rate: {error_rate:.1f}%
-📋 Queue Size: {queue_size}
+Messages Processed: {bot.messages_processed}
+Average Response Time: {avg_response_time:.2f}s
+Uptime: {uptime_str}
+Messages/Hour: {messages_per_hour:.1f}
+Error Count: {bot.error_count}
+Error Rate: {error_rate:.1f}%
+Queue Size: {queue_size}
 
-💡 Fun Facts:
-• Fastest response: {min(bot.response_times) if bot.response_times else 0:.2f}s
-• Slowest response: {max(bot.response_times) if bot.response_times else 0:.2f}s
-• Total thinking time: {sum(bot.response_times):.1f}s"""
+Fun Facts:
+- Fastest response: {min(bot.response_times) if bot.response_times else 0:.2f}s
+- Slowest response: {max(bot.response_times) if bot.response_times else 0:.2f}s
+- Total thinking time: {sum(bot.response_times):.1f}s"""
 
         ctx.reply(stats_text, lxmf_fields=bot.icon_lxmf_field)
 
     @bot.command(name="operator")
     def operator_command(ctx):
         """Show bot operator information"""
-        operator_text = f"""👤 Bot Operator 👤
+        operator_text = f"""Bot Operator
 
 Operator: {BOT_OPERATOR}
 
 This bot is operated by {BOT_OPERATOR}.
 For questions or concerns, contact the operator through LXMF.
 
-⚡ Powered by LXMFy & Ollama"""
+Powered by LXMFy & Ollama"""
 
         ctx.reply(operator_text, lxmf_fields=bot.icon_lxmf_field)
 
