@@ -10,6 +10,7 @@ from lxmfy import IconAppearance, LXMFBot, pack_icon_appearance_field
 
 
 def parse_args():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Ollama Bot")
     parser.add_argument("--env", type=str, help="Path to env file")
     parser.add_argument("--name", type=str, help="Bot name")
@@ -39,15 +40,41 @@ LXMF_ADMINS = (
     if args.admins
     else set(filter(None, os.getenv("LXMF_ADMINS", "").split(",")))
 )
-SIGNATURE_VERIFICATION_ENABLED = os.getenv("SIGNATURE_VERIFICATION_ENABLED", "false").lower() == "true"
-REQUIRE_MESSAGE_SIGNATURES = os.getenv("REQUIRE_MESSAGE_SIGNATURES", "false").lower() == "true"
+SIGNATURE_VERIFICATION_ENABLED = (
+    os.getenv("SIGNATURE_VERIFICATION_ENABLED", "false").lower() == "true"
+)
+REQUIRE_MESSAGE_SIGNATURES = (
+    os.getenv("REQUIRE_MESSAGE_SIGNATURES", "false").lower() == "true"
+)
 BOT_ICON = os.getenv("BOT_ICON", "robot")
 ICON_FG_COLOR = os.getenv("ICON_FG_COLOR", "ffffff")
 ICON_BG_COLOR = os.getenv("ICON_BG_COLOR", "2563eb")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "")
+BOT_OPERATOR = os.getenv("BOT_OPERATOR", "Anonymous Operator")
+
+
+def format_uptime(seconds):
+    """Format seconds into a human-readable uptime string"""
+    days, remainder = divmod(int(seconds), 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if seconds > 0 or not parts:
+        parts.append(f"{seconds}s")
+
+    return " ".join(parts)
 
 
 class OllamaAPI:
+    """API client for interacting with Ollama models."""
+
     def __init__(self, api_url, timeout=900, queue_size=10):
         self.api_url = api_url
         self.timeout = timeout
@@ -167,6 +194,13 @@ def create_bot():
     bot.ollama = OllamaAPI(OLLAMA_API_URL, queue_size=10)
     bot.save_chat_history = SAVE_CHAT_HISTORY
 
+    # Statistics tracking
+    bot.start_time = time.time()
+    bot.messages_processed = 0
+    bot.total_response_time = 0
+    bot.error_count = 0
+    bot.response_times = []
+
     @bot.command(name="help")
     def help_command(ctx):
         """Show available commands"""
@@ -175,6 +209,8 @@ def create_bot():
 === General ===
 /help - Show this help message
 /about - Show bot information
+/stats - Show bot statistics and performance metrics
+/operator - Show bot operator information
 
 === Chat ===
 Send any message without the "/" prefix to chat with the AI model.
@@ -200,6 +236,54 @@ This bot allows you to chat with AI models through Ollama.
 Simply send a message without any command prefix to start chatting."""
         ctx.reply(about_text, lxmf_fields=bot.icon_lxmf_field)
 
+    @bot.command(name="stats")
+    def stats_command(ctx):
+        """Show bot statistics and performance metrics"""
+        uptime_seconds = time.time() - bot.start_time
+        uptime_str = format_uptime(uptime_seconds)
+
+        avg_response_time = 0
+        if bot.messages_processed > 0:
+            avg_response_time = sum(bot.response_times) / len(bot.response_times)
+
+        # Calculate some fun metrics
+        messages_per_hour = (bot.messages_processed / max(uptime_seconds, 1)) * 3600
+        error_rate = (bot.error_count / max(bot.messages_processed, 1)) * 100
+
+        # Get current queue status
+        queue_size = bot.ollama.request_queue.qsize()
+
+        stats_text = f"""🤖 Bot Statistics 🤖
+
+📊 Messages Processed: {bot.messages_processed}
+⏱️  Average Response Time: {avg_response_time:.2f}s
+🕐 Uptime: {uptime_str}
+📈 Messages/Hour: {messages_per_hour:.1f}
+❌ Error Count: {bot.error_count}
+📊 Error Rate: {error_rate:.1f}%
+📋 Queue Size: {queue_size}
+
+💡 Fun Facts:
+• Fastest response: {min(bot.response_times) if bot.response_times else 0:.2f}s
+• Slowest response: {max(bot.response_times) if bot.response_times else 0:.2f}s
+• Total thinking time: {sum(bot.response_times):.1f}s"""
+
+        ctx.reply(stats_text, lxmf_fields=bot.icon_lxmf_field)
+
+    @bot.command(name="operator")
+    def operator_command(ctx):
+        """Show bot operator information"""
+        operator_text = f"""👤 Bot Operator 👤
+
+Operator: {BOT_OPERATOR}
+
+This bot is operated by {BOT_OPERATOR}.
+For questions or concerns, contact the operator through LXMF.
+
+⚡ Powered by LXMFy & Ollama"""
+
+        ctx.reply(operator_text, lxmf_fields=bot.icon_lxmf_field)
+
 
 
     @bot.events.on("message_received")
@@ -223,14 +307,28 @@ Simply send a message without any command prefix to start chatting."""
         if not content_str:
             return
 
-
+        # Track message processing start
+        request_start_time = time.time()
+        bot.messages_processed += 1
 
         def callback(response):
             """Handle Ollama API response"""
+            # Track response time
+            response_time = time.time() - request_start_time
+            bot.response_times.append(response_time)
+            # Keep only last 1000 response times to prevent memory issues
+            if len(bot.response_times) > 1000:
+                bot.response_times.pop(0)
+
             if "error" in response:
+                bot.error_count += 1
                 error_msg = response["error"]
                 if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                    bot.send(sender_hash, f"Unable to connect to Ollama API. Please check if Ollama is running at {OLLAMA_API_URL}", lxmf_fields=bot.icon_lxmf_field)
+                    error_text = (
+                        f"Unable to connect to Ollama API. Please check if Ollama is "
+                        f"running at {OLLAMA_API_URL}"
+                    )
+                    bot.send(sender_hash, error_text, lxmf_fields=bot.icon_lxmf_field)
                 else:
                     bot.send(sender_hash, f"Error: {error_msg}", lxmf_fields=bot.icon_lxmf_field)
             else:
@@ -254,19 +352,23 @@ Simply send a message without any command prefix to start chatting."""
             messages.append({"role": "user", "content": content_str})
             bot.ollama.chat(messages, callback=callback)
         except Exception as e:
-            bot.send(sender_hash, f"Failed to process message: {e!s}", lxmf_fields=bot.icon_lxmf_field)
+            error_text = f"Failed to process message: {e!s}"
+            bot.send(sender_hash, error_text, lxmf_fields=bot.icon_lxmf_field)
 
     return bot
 
 
 def main():
+    """Main entry point for the bot."""
     print(f"Starting {BOT_NAME}...")
     print(f"Ollama API: {OLLAMA_API_URL}")
     print(f"Model: {MODEL}")
     if LXMF_ADMINS:
         print(f"Admins: {len(LXMF_ADMINS)} configured")
-    print(f"Signature Verification: {'Enabled' if SIGNATURE_VERIFICATION_ENABLED else 'Disabled'}")
-    print(f"Require Message Signatures: {'Yes' if REQUIRE_MESSAGE_SIGNATURES else 'No'}")
+    sig_status = "Enabled" if SIGNATURE_VERIFICATION_ENABLED else "Disabled"
+    print(f"Signature Verification: {sig_status}")
+    sig_required = "Yes" if REQUIRE_MESSAGE_SIGNATURES else "No"
+    print(f"Require Message Signatures: {sig_required}")
     print(f"Bot Icon: {BOT_ICON}")
     print(f"Icon Colors: FG={ICON_FG_COLOR}, BG={ICON_BG_COLOR}")
 
