@@ -44,6 +44,7 @@ REQUIRE_MESSAGE_SIGNATURES = os.getenv("REQUIRE_MESSAGE_SIGNATURES", "false").lo
 BOT_ICON = os.getenv("BOT_ICON", "robot")
 ICON_FG_COLOR = os.getenv("ICON_FG_COLOR", "ffffff")
 ICON_BG_COLOR = os.getenv("ICON_BG_COLOR", "2563eb")
+SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "")
 
 
 class OllamaAPI:
@@ -247,7 +248,11 @@ Simply send a message without any command prefix to start chatting."""
 
         # Send chat message to Ollama
         try:
-            bot.ollama.chat([{"role": "user", "content": content_str}], callback=callback)
+            messages = []
+            if SYSTEM_PROMPT:
+                messages.append({"role": "system", "content": SYSTEM_PROMPT})
+            messages.append({"role": "user", "content": content_str})
+            bot.ollama.chat(messages, callback=callback)
         except Exception as e:
             bot.send(sender_hash, f"Failed to process message: {e!s}", lxmf_fields=bot.icon_lxmf_field)
 
