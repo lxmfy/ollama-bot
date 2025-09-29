@@ -6,12 +6,13 @@ from threading import Thread
 
 import requests
 from dotenv import load_dotenv
-from lxmfy import LXMFBot
+from lxmfy import IconAppearance, LXMFBot, pack_icon_appearance_field
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Ollama Bot")
     parser.add_argument("--env", type=str, help="Path to env file")
+    parser.add_argument("--name", type=str, help="Bot name")
     parser.add_argument("--api-url", type=str, help="Ollama API URL")
     parser.add_argument("--model", type=str, help="Ollama model name")
     parser.add_argument(
@@ -27,6 +28,7 @@ if args.env:
 else:
     load_dotenv()
 
+BOT_NAME = args.name or os.getenv("BOT_NAME", "OllamaBot")
 OLLAMA_API_URL = args.api_url or os.getenv(
     "OLLAMA_API_URL", "http://localhost:11434"
 )
@@ -37,6 +39,11 @@ LXMF_ADMINS = (
     if args.admins
     else set(filter(None, os.getenv("LXMF_ADMINS", "").split(",")))
 )
+SIGNATURE_VERIFICATION_ENABLED = os.getenv("SIGNATURE_VERIFICATION_ENABLED", "false").lower() == "true"
+REQUIRE_MESSAGE_SIGNATURES = os.getenv("REQUIRE_MESSAGE_SIGNATURES", "false").lower() == "true"
+BOT_ICON = os.getenv("BOT_ICON", "robot")
+ICON_FG_COLOR = os.getenv("ICON_FG_COLOR", "ffffff")
+ICON_BG_COLOR = os.getenv("ICON_BG_COLOR", "2563eb")
 
 
 class OllamaAPI:
@@ -124,7 +131,7 @@ class OllamaAPI:
 
 def create_bot():
     bot = LXMFBot(
-        name="OllamaBot",
+        name=BOT_NAME,
         announce=600,
         admins=LXMF_ADMINS,
         hot_reloading=True,
@@ -135,7 +142,26 @@ def create_bot():
         warning_timeout=300,
         cogs_enabled=False,
         cogs_dir="",
+        signature_verification_enabled=SIGNATURE_VERIFICATION_ENABLED,
+        require_message_signatures=REQUIRE_MESSAGE_SIGNATURES,
     )
+
+    # Set up bot icon
+    try:
+        icon_data = IconAppearance(
+            icon_name=BOT_ICON,
+            fg_color=bytes.fromhex(ICON_FG_COLOR),
+            bg_color=bytes.fromhex(ICON_BG_COLOR),
+        )
+        bot.icon_lxmf_field = pack_icon_appearance_field(icon_data)
+    except ValueError as e:
+        print(f"Warning: Invalid icon color format: {e}. Using default colors.")
+        icon_data = IconAppearance(
+            icon_name=BOT_ICON,
+            fg_color=b"\xff\xff\xff",  # white
+            bg_color=b"\x25\x63\xeb",  # blue
+        )
+        bot.icon_lxmf_field = pack_icon_appearance_field(icon_data)
 
     bot.ollama = OllamaAPI(OLLAMA_API_URL, queue_size=10)
     bot.save_chat_history = SAVE_CHAT_HISTORY
@@ -152,20 +178,26 @@ def create_bot():
 === Chat ===
 Send any message without the "/" prefix to chat with the AI model.
 The bot will respond using the configured Ollama model."""
-        ctx.reply(help_text)
+        ctx.reply(help_text, lxmf_fields=bot.icon_lxmf_field)
 
     @bot.command(name="about")
     def about_command(ctx):
         """Show bot information"""
+        sig_status = "Enabled" if SIGNATURE_VERIFICATION_ENABLED else "Disabled"
+        sig_required = "Required" if REQUIRE_MESSAGE_SIGNATURES else "Optional"
         about_text = f"""OllamaBot v1.0.0
 
 Connected to: {OLLAMA_API_URL}
 Model: {MODEL}
 Admins: {len(LXMF_ADMINS)} configured
+Signature Verification: {sig_status}
+Message Signatures: {sig_required}
+Bot Icon: {BOT_ICON}
+Icon Colors: FG={ICON_FG_COLOR}, BG={ICON_BG_COLOR}
 
 This bot allows you to chat with AI models through Ollama.
 Simply send a message without any command prefix to start chatting."""
-        ctx.reply(about_text)
+        ctx.reply(about_text, lxmf_fields=bot.icon_lxmf_field)
 
 
 
@@ -181,7 +213,7 @@ Simply send a message without any command prefix to start chatting."""
         try:
             content_str = lxmf_message.content.decode("utf-8").strip()
         except UnicodeDecodeError:
-            bot.send(sender_hash, "Error: Message content is not valid UTF-8.")
+            bot.send(sender_hash, "Error: Message content is not valid UTF-8.", lxmf_fields=bot.icon_lxmf_field)
             return
 
         if bot.command_prefix and content_str.startswith(bot.command_prefix):
@@ -197,9 +229,9 @@ Simply send a message without any command prefix to start chatting."""
             if "error" in response:
                 error_msg = response["error"]
                 if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                    bot.send(sender_hash, f"Unable to connect to Ollama API. Please check if Ollama is running at {OLLAMA_API_URL}")
+                    bot.send(sender_hash, f"Unable to connect to Ollama API. Please check if Ollama is running at {OLLAMA_API_URL}", lxmf_fields=bot.icon_lxmf_field)
                 else:
-                    bot.send(sender_hash, f"Error: {error_msg}")
+                    bot.send(sender_hash, f"Error: {error_msg}", lxmf_fields=bot.icon_lxmf_field)
             else:
                 if "response" in response:
                     text = response["response"]
@@ -209,25 +241,29 @@ Simply send a message without any command prefix to start chatting."""
                     text = "Unexpected response format"
 
                 if text.strip():
-                    bot.send(sender_hash, text.strip())
+                    bot.send(sender_hash, text.strip(), lxmf_fields=bot.icon_lxmf_field)
                 else:
-                    bot.send(sender_hash, "Received empty response from AI model")
+                    bot.send(sender_hash, "Received empty response from AI model", lxmf_fields=bot.icon_lxmf_field)
 
         # Send chat message to Ollama
         try:
             bot.ollama.chat([{"role": "user", "content": content_str}], callback=callback)
         except Exception as e:
-            bot.send(sender_hash, f"Failed to process message: {str(e)}")
+            bot.send(sender_hash, f"Failed to process message: {str(e)}", lxmf_fields=bot.icon_lxmf_field)
 
     return bot
 
 
 def main():
-    print("Starting OllamaBot...")
+    print(f"Starting {BOT_NAME}...")
     print(f"Ollama API: {OLLAMA_API_URL}")
     print(f"Model: {MODEL}")
     if LXMF_ADMINS:
         print(f"Admins: {len(LXMF_ADMINS)} configured")
+    print(f"Signature Verification: {'Enabled' if SIGNATURE_VERIFICATION_ENABLED else 'Disabled'}")
+    print(f"Require Message Signatures: {'Yes' if REQUIRE_MESSAGE_SIGNATURES else 'No'}")
+    print(f"Bot Icon: {BOT_ICON}")
+    print(f"Icon Colors: FG={ICON_FG_COLOR}, BG={ICON_BG_COLOR}")
 
     bot = create_bot()
     bot.run()
