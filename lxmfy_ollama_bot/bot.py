@@ -47,7 +47,7 @@ ICON_BG_COLOR = os.getenv("ICON_BG_COLOR", "2563eb")
 
 
 class OllamaAPI:
-    def __init__(self, api_url, timeout=30, queue_size=10):
+    def __init__(self, api_url, timeout=900, queue_size=10):
         self.api_url = api_url
         self.timeout = timeout
         self.request_queue = Queue(maxsize=queue_size)
