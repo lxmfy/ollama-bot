@@ -6,5 +6,5 @@ with the LXMF (Local eXtended Message Format) network for decentralized messagin
 
 from .bot import OllamaAPI, create_bot
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __all__ = ["OllamaAPI", "create_bot"]
