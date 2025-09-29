@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument("--api-url", type=str, help="Ollama API URL")
     parser.add_argument("--model", type=str, help="Ollama model name")
     parser.add_argument(
-        "--admins", type=str, help="Comma-separated list of admin LXMF hashes"
+        "--admins", type=str, help="Comma-separated list of admin LXMF hashes",
     )
     return parser.parse_args()
 
@@ -30,7 +30,7 @@ else:
 
 BOT_NAME = args.name or os.getenv("BOT_NAME", "OllamaBot")
 OLLAMA_API_URL = args.api_url or os.getenv(
-    "OLLAMA_API_URL", "http://localhost:11434"
+    "OLLAMA_API_URL", "http://localhost:11434",
 )
 MODEL = args.model or os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 SAVE_CHAT_HISTORY = False
@@ -249,7 +249,7 @@ Simply send a message without any command prefix to start chatting."""
         try:
             bot.ollama.chat([{"role": "user", "content": content_str}], callback=callback)
         except Exception as e:
-            bot.send(sender_hash, f"Failed to process message: {str(e)}", lxmf_fields=bot.icon_lxmf_field)
+            bot.send(sender_hash, f"Failed to process message: {e!s}", lxmf_fields=bot.icon_lxmf_field)
 
     return bot
 
