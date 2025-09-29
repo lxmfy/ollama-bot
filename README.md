@@ -22,9 +22,11 @@ edit `.env` with your Ollama API URL, Model, and LXMF address.
 ```
 pip install lxmfy
 
+# using pipx
+
 pipx install git+https://github.com/lxmfy/ollama-bot.git
 
-# using Git
+# using pipx + git
 
 pipx install git+https://github.com/lxmfy/ollama-bot.git
 ```
