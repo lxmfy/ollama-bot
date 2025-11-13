@@ -197,7 +197,6 @@ def create_bot():
     # Statistics tracking
     bot.start_time = time.time()
     bot.messages_processed = 0
-    bot.total_response_time = 0
     bot.error_count = 0
     bot.response_times = []
 
@@ -309,16 +308,11 @@ Powered by LXMFy & Ollama"""
 
         # Track message processing start
         request_start_time = time.time()
-        bot.messages_processed += 1
 
         def callback(response):
             """Handle Ollama API response"""
             # Track response time
             response_time = time.time() - request_start_time
-            bot.response_times.append(response_time)
-            # Keep only last 1000 response times to prevent memory issues
-            if len(bot.response_times) > 1000:
-                bot.response_times.pop(0)
 
             if "error" in response:
                 bot.error_count += 1
@@ -332,6 +326,10 @@ Powered by LXMFy & Ollama"""
                 else:
                     bot.send(sender_hash, f"Error: {error_msg}", lxmf_fields=bot.icon_lxmf_field)
             else:
+                bot.response_times.append(response_time)
+                if len(bot.response_times) > 1000:
+                    bot.response_times.pop(0)
+
                 if "response" in response:
                     text = response["response"]
                 elif "message" in response:
@@ -346,12 +344,14 @@ Powered by LXMFy & Ollama"""
 
         # Send chat message to Ollama
         try:
+            bot.messages_processed += 1
             messages = []
             if SYSTEM_PROMPT:
                 messages.append({"role": "system", "content": SYSTEM_PROMPT})
             messages.append({"role": "user", "content": content_str})
             bot.ollama.chat(messages, callback=callback)
         except Exception as e:
+            bot.error_count += 1
             error_text = f"Failed to process message: {e!s}"
             bot.send(sender_hash, error_text, lxmf_fields=bot.icon_lxmf_field)
 
