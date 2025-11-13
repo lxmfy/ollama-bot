@@ -243,7 +243,7 @@ Simply send a message without any command prefix to start chatting."""
         uptime_str = format_uptime(uptime_seconds)
 
         avg_response_time = 0
-        if bot.messages_processed > 0:
+        if bot.response_times:
             avg_response_time = sum(bot.response_times) / len(bot.response_times)
 
         # Calculate some fun metrics
