@@ -2,7 +2,7 @@ ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-alpine
 
 LABEL org.opencontainers.image.source="https://github.com/lxmfy/ollama-bot"
-LABEL org.opencontainers.image.description="An LXMF bot for interacting with Ollama LLM Models"
+LABEL org.opencontainers.image.description="An LXMFy bot for interacting with Ollama LLMs"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.authors="LXMFy"
 
