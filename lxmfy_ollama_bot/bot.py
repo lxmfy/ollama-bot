@@ -17,7 +17,9 @@ def parse_args():
     parser.add_argument("--api-url", type=str, help="Ollama API URL")
     parser.add_argument("--model", type=str, help="Ollama model name")
     parser.add_argument(
-        "--admins", type=str, help="Comma-separated list of admin LXMF hashes",
+        "--admins",
+        type=str,
+        help="Comma-separated list of admin LXMF hashes",
     )
     return parser.parse_args()
 
@@ -31,7 +33,8 @@ else:
 
 BOT_NAME = args.name or os.getenv("BOT_NAME", "OllamaBot")
 OLLAMA_API_URL = args.api_url or os.getenv(
-    "OLLAMA_API_URL", "http://localhost:11434",
+    "OLLAMA_API_URL",
+    "http://localhost:11434",
 )
 MODEL = args.model or os.getenv("OLLAMA_MODEL", "llama3.2:latest")
 SAVE_CHAT_HISTORY = False
@@ -51,6 +54,63 @@ ICON_FG_COLOR = os.getenv("ICON_FG_COLOR", "ffffff")
 ICON_BG_COLOR = os.getenv("ICON_BG_COLOR", "2563eb")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "")
 BOT_OPERATOR = os.getenv("BOT_OPERATOR", "Anonymous Operator")
+CONTEXT_FILES = os.getenv("CONTEXT_FILES", "")
+
+
+def load_context_files(file_paths_str):
+    """Load content from context files specified in CONTEXT_FILES env var.
+
+    Args:
+        file_paths_str: Comma-separated string of file paths
+
+    Returns:
+        Combined content from all context files, or empty string if none found
+
+    """
+    if not file_paths_str:
+        return ""
+
+    context_parts = []
+    file_paths = [path.strip() for path in file_paths_str.split(",") if path.strip()]
+
+    for file_path in file_paths:
+        if not os.path.exists(file_path):
+            print(f"Warning: Context file not found: {file_path}")
+            continue
+
+        if not file_path.endswith((".txt", ".md")):
+            print(f"Warning: Context file must be .txt or .md: {file_path}")
+            continue
+
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    context_parts.append(content)
+                    print(f"Loaded context from: {file_path}")
+        except Exception as e:
+            print(f"Error reading context file {file_path}: {e}")
+
+    return "\n\n".join(context_parts) if context_parts else ""
+
+
+def build_system_prompt(base_prompt, context_content):
+    """Combine base system prompt with context file content.
+
+    Args:
+        base_prompt: Base system prompt from SYSTEM_PROMPT env var
+        context_content: Content loaded from context files
+
+    Returns:
+        Combined system prompt string
+
+    """
+    parts = []
+    if context_content:
+        parts.append(context_content)
+    if base_prompt:
+        parts.append(base_prompt)
+    return "\n\n".join(parts) if parts else ""
 
 
 def format_uptime(seconds):
@@ -92,7 +152,9 @@ class OllamaAPI:
                 if models:
                     print(f"✓ Connected to Ollama. {len(models)} model(s) available")
                     if not any(MODEL in m["name"] for m in models):
-                        print(f"⚠ Warning: Configured model '{MODEL}' not found in available models")
+                        print(
+                            f"⚠ Warning: Configured model '{MODEL}' not found in available models"
+                        )
                 else:
                     print("⚠ Connected to Ollama but no models available")
             else:
@@ -116,7 +178,7 @@ class OllamaAPI:
                     callback(result)
                 except Exception as e:
                     callback({"error": str(e)})
-                    time.sleep(1) # Add sleep here to prevent busy-waiting on errors
+                    time.sleep(1)  # Add sleep here to prevent busy-waiting on errors
                 finally:
                     self.request_queue.task_done()
 
@@ -155,6 +217,10 @@ class OllamaAPI:
             timeout=self.timeout,
         )
         return response.json()
+
+
+CONTEXT_CONTENT = load_context_files(CONTEXT_FILES)
+FULL_SYSTEM_PROMPT = build_system_prompt(SYSTEM_PROMPT, CONTEXT_CONTENT)
 
 
 def create_bot():
@@ -283,21 +349,27 @@ Powered by LXMFy & Ollama"""
 
         ctx.reply(operator_text, lxmf_fields=bot.icon_lxmf_field)
 
-
-
     @bot.events.on("message_received")
     def handle_message(event):
         """Handle all incoming messages"""
         lxmf_message = event.data.get("message")
         sender_hash = event.data.get("sender")
 
-        if not lxmf_message or not hasattr(lxmf_message, "content") or not lxmf_message.content:
+        if (
+            not lxmf_message
+            or not hasattr(lxmf_message, "content")
+            or not lxmf_message.content
+        ):
             return
 
         try:
             content_str = lxmf_message.content.decode("utf-8").strip()
         except UnicodeDecodeError:
-            bot.send(sender_hash, "Error: Message content is not valid UTF-8.", lxmf_fields=bot.icon_lxmf_field)
+            bot.send(
+                sender_hash,
+                "Error: Message content is not valid UTF-8.",
+                lxmf_fields=bot.icon_lxmf_field,
+            )
             return
 
         if bot.command_prefix and content_str.startswith(bot.command_prefix):
@@ -324,7 +396,11 @@ Powered by LXMFy & Ollama"""
                     )
                     bot.send(sender_hash, error_text, lxmf_fields=bot.icon_lxmf_field)
                 else:
-                    bot.send(sender_hash, f"Error: {error_msg}", lxmf_fields=bot.icon_lxmf_field)
+                    bot.send(
+                        sender_hash,
+                        f"Error: {error_msg}",
+                        lxmf_fields=bot.icon_lxmf_field,
+                    )
             else:
                 bot.response_times.append(response_time)
                 if len(bot.response_times) > 1000:
@@ -340,14 +416,18 @@ Powered by LXMFy & Ollama"""
                 if text.strip():
                     bot.send(sender_hash, text.strip(), lxmf_fields=bot.icon_lxmf_field)
                 else:
-                    bot.send(sender_hash, "Received empty response from AI model", lxmf_fields=bot.icon_lxmf_field)
+                    bot.send(
+                        sender_hash,
+                        "Received empty response from AI model",
+                        lxmf_fields=bot.icon_lxmf_field,
+                    )
 
         # Send chat message to Ollama
         try:
             bot.messages_processed += 1
             messages = []
-            if SYSTEM_PROMPT:
-                messages.append({"role": "system", "content": SYSTEM_PROMPT})
+            if FULL_SYSTEM_PROMPT:
+                messages.append({"role": "system", "content": FULL_SYSTEM_PROMPT})
             messages.append({"role": "user", "content": content_str})
             bot.ollama.chat(messages, callback=callback)
         except Exception as e:
