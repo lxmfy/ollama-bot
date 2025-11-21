@@ -17,17 +17,23 @@ edit `.env` with your Ollama API URL, Model, and LXMF address.
 
 ## Installation and Running
 
+### Using Makefile
+
+Requires `poetry` and `make` to be installed.
+
+```
+make install
+make run
+```
+
+### Using pipx
+
 ```
 pipx install git+https://github.com/lxmfy/ollama-bot.git
-```
-
-### Run
-
-```
 lxmfy-ollama-bot
 ```
 
-### Poetry
+### Using Poetry directly
 
 ```
 poetry install
@@ -35,6 +41,15 @@ poetry run lxmfy-ollama-bot
 ```
 
 ## Docker
+
+### Using Makefile
+
+```
+make docker-pull
+make docker-run
+```
+
+### Using Docker directly
 
 First, pull the latest image:
 
@@ -67,3 +82,5 @@ Command prefix: `/`
 Send any message **without** the `/` prefix to chat with the AI model.
 
 The bot will automatically respond using the configured Ollama model.
+
+Note: This only uses `/api/generate` ollama endpoint so bot wont remember your last message.
